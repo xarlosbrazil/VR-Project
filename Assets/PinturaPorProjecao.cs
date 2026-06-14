@@ -3,6 +3,9 @@ using UnityEngine.InputSystem;
 
 public class PinturaPorProjecao : MonoBehaviour
 {
+    [Header("Modo de Jogo")]
+    public bool modoVR = false; // Marque True no Inspector quando for testar no Oculus!
+
     [Header("Configurações do Alvo")]
     public LayerMask layerDaSuperficie;
 
@@ -10,9 +13,23 @@ public class PinturaPorProjecao : MonoBehaviour
     [Range(2, 50)] public int raioPincel = 12;
     public Color corPintura = Color.black;
 
+    [Header("Controles VR (Oculus/Quest)")]
+    [Tooltip("Arraste aqui a ação de Gatilho do controle (ex: XR Controller / Optional Controls / Trigger)")]
+    public InputActionReference gatilhoVRClick;
+
     private MeshRenderer pincelMeshRenderer;
     private Texture2D texturaDinamica;
     private int tamanhoTextura;
+
+    void OnEnable()
+    {
+        if (modoVR && gatilhoVRClick != null) gatilhoVRClick.action.Enable();
+    }
+
+    void OnDisable()
+    {
+        if (modoVR && gatilhoVRClick != null) gatilhoVRClick.action.Disable();
+    }
 
     void Start()
     {
@@ -21,41 +38,55 @@ public class PinturaPorProjecao : MonoBehaviour
 
     void Update()
     {
-        if (Mouse.current == null) return;
+        Ray raio;
+        bool estaClicando = false;
 
-        // 1. O Pincel segue o mouse visualmente na tela
-        Vector2 posicaoMouse = Mouse.current.position.ReadValue();
-        Ray raio = Camera.main.ScreenPointToRay(posicaoMouse);
+        if (modoVR)
+        {
+            // === LOGICA PARA VR (META QUEST 3) ===
+            // O raio nasce na posição do controle e atira para a frente dele (Z positivo)
+            raio = new Ray(transform.parent.position, transform.parent.forward);
+
+            // Verifica se o gatilho do controle está pressionado
+            if (gatilhoVRClick != null)
+            {
+                estaClicando = gatilhoVRClick.action.IsPressed();
+            }
+        }
+        else
+        {
+            // === LOGICA PARA PC (MOUSE) ===
+            if (Mouse.current == null) return;
+            Vector2 posicaoMouse = Mouse.current.position.ReadValue();
+            raio = Camera.main.ScreenPointToRay(posicaoMouse);
+            estaClicando = Mouse.current.leftButton.isPressed;
+        }
+
         RaycastHit hit;
 
-        // 2. Projeta o raio continuamente
+        // Executa o disparo do raio
         if (Physics.Raycast(raio, out hit, 100f, layerDaSuperficie))
         {
-            // Posiciona a esfera visual exatamente no ponto da casca do cilindro
+            // Move a esferinha visual exatamente para onde o laser do VR está apontando no cilindro
             transform.position = hit.point;
             if (pincelMeshRenderer != null) pincelMeshRenderer.enabled = true;
 
-            // 3. MÁGICA DA PINTURA: Se o jogador segurar o clique esquerdo do mouse, pinta!
-            if (Mouse.current.leftButton.isPressed)
+            // Se estiver apertando o gatilho (VR) ou clique esquerdo (PC), pinta!
+            if (estaClicando)
             {
-                // Pega o componente Renderer do objeto que o raio ACERTOU (o Cilindro)
                 Renderer cilindroRenderer = hit.transform.GetComponent<Renderer>();
 
                 if (cilindroRenderer != null)
                 {
-                    // Pega a textura que está rodando no material do cilindro
                     texturaDinamica = (Texture2D)cilindroRenderer.material.mainTexture;
 
                     if (texturaDinamica != null)
                     {
                         tamanhoTextura = texturaDinamica.width;
-
-                        // Converte a coordenada UV do ponto de impacto para pixels
                         Vector2 coordenadaUV = hit.textureCoord;
                         int pixelX = (int)(coordenadaUV.x * tamanhoTextura);
                         int pixelY = (int)(coordenadaUV.y * tamanhoTextura);
 
-                        // Executa a pintura circular
                         PintarNaTextura(pixelX, pixelY);
                     }
                 }
@@ -63,6 +94,7 @@ public class PinturaPorProjecao : MonoBehaviour
         }
         else
         {
+            // Se o controle apontar para o teto ou fora do cilindro, esconde a esferinha
             if (pincelMeshRenderer != null) pincelMeshRenderer.enabled = false;
         }
     }
@@ -90,6 +122,6 @@ public class PinturaPorProjecao : MonoBehaviour
                 }
             }
         }
-        texturaDinamica.Apply(); // Força a atualização na GPU
+        texturaDinamica.Apply();
     }
 }

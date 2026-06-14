@@ -13,14 +13,16 @@ public class GerenciadorJogo : MonoBehaviour
     public AudioClip somPassosSaindo;
     public AudioClip somPassosChegando;
 
+    [Header("Sistema de Diálogo")]
+    public BalaoDialogo scriptBalao;
+
     private bool emTransicao = false;
 
     void Start()
     {
-        // Garante que o jogo comece limpando a tela para o jogador ver o cenário de largada
+        // 1. Garante que o jogo comece limpando a tela (Fade-In de 1 para 0)
         if (scriptTransicao != null)
         {
-            // Força a tela a começar 100% preta
             if (scriptTransicao.telaPreta != null)
             {
                 Color c = scriptTransicao.telaPreta.color;
@@ -28,8 +30,15 @@ public class GerenciadorJogo : MonoBehaviour
                 scriptTransicao.telaPreta.color = c;
             }
 
-            // Faz o Fade-In inicial automático (de 1 para 0)
             StartCoroutine(scriptTransicao.Fade(1f, 0f));
+        }
+
+        // ==========================================
+        // NOVO: DISPARA O BALÃO LOGO NA LARGADA!
+        // ==========================================
+        if (scriptBalao != null)
+        {
+            scriptBalao.DispararDialogo();
         }
 
         // Toca a primeira interjeição/saudação do dia assim que o jogo inicia
@@ -64,6 +73,18 @@ public class GerenciadorJogo : MonoBehaviour
     {
         emTransicao = true;
         Debug.Log("1. Começou o Fade Out");
+
+        if (scriptBalao != null)
+        {
+            // Manda o balão sumir suavemente em 1 segundo
+            StartCoroutine(scriptBalao.FadeOutBalao(1.0f));
+        }
+
+        // 1. ESCURECE A TELA (Fade out da câmera)
+        if (scriptTransicao != null)
+        {
+            yield return StartCoroutine(scriptTransicao.Fade(0f, 1f));
+        }
 
         if (scriptTransicao != null)
         {
@@ -106,10 +127,18 @@ public class GerenciadorJogo : MonoBehaviour
             yield return StartCoroutine(scriptTransicao.Fade(1f, 0f));
         }
 
+
+        if (scriptBalao != null)
+        {
+            scriptBalao.DispararDialogo();
+        }
+
         if (GerenciadorAudio.Instancia != null && personagemCadeira != null)
         {
             GerenciadorAudio.Instancia.TocarSaudacaoAleatoria(personagemCadeira.transform.position);
         }
+
+
 
         emTransicao = false;
         Debug.Log("6. Fluxo concluído!");
